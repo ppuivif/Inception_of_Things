@@ -47,6 +47,11 @@ vagrant up
 ```
 Crée les 2 VM et installe K3s (server puis agent) via les scripts de provisioning.
 
+**Vérifier le status des VM du projet courant :**
+```BASH
+vagrant status
+```
+
 **Se connecter en SSH :**
 ```bash
 vagrant ssh loginS
@@ -187,8 +192,8 @@ argocd app get wil-playground
 ```
 
 **Passer de v1 à v2 :**
-Modifier le deployement.yaml , image v1 en v2.
-Push sur github.
+Modifier le `deployment.yaml`, image v1 en v2.
+Push sur GitHub.
 Retester : 
 ```bash
 curl http://localhost:8888/
@@ -200,13 +205,16 @@ Doit renvoyer `{"status":"ok", "message": "v2"}`.
 argocd app sync wil-playground
 ```
 
-**Si le tunnel casse après un changement de version :**
+L'appli est exposée via un **Service de type LoadBalancer** : le port `8888` est mappé directement au cluster K3d
+(`k3d cluster create iot -p "8888:8888@loadbalancer"`). Seul Argo CD (port `8080`)
+utilise encore un port-forward classique.
+
+**Vérifier le port-forward d'Argo CD :**
 ```bash
-pkill -f "port-forward.*8888"
-kubectl port-forward svc/wil-playground -n dev 8888:8888 &
-sleep 2
-curl http://localhost:8888/
+ps aux | grep "port-forward" | grep -v grep
 ```
+
+**Docker Hub de l'image utilisée :** https://hub.docker.com/r/wil42/playground
 
 **Nettoyage :**
 ```bash
@@ -250,16 +258,21 @@ curl -sI http://gitlab.k3d.gitlab.com/users/sign_in | head -1
 ```
 Doit renvoyer `200 OK`.
 
-**Créer le dépôt (obligatoire avant `update.sh`) :**
+**Créer le dépôt (obligatoire avant `init.sh`) :**
 1. Ouvrir `http://gitlab.k3d.gitlab.com`, se connecter en `root`
 2. `+` → New project/repository → Create blank project
-3. Namespace `root`, nom `test`, README décoché, visibilité **Public**
+3. Namespace `root`, nom `new_test` (valeur par défaut de `init.sh`), README décoché, visibilité **Public**
 
-**Copier les manifests de p3 vers GitLab :**
+**Connecter l'appli à ce dépôt (première fois) :**
 ```bash
-bash scripts/update.sh
+bash scripts/init.sh
 ```
-(Optionnel : `GITLAB_PROJECT=root/monnom bash scripts/update.sh` pour utiliser un autre nom de dépôt)
+(Optionnel : `GITLAB_PROJECT=root/monnom bash scripts/init.sh` pour utiliser un autre nom de dépôt)
+
+Clone le dépôt vide, y copie les manifests de `p3/confs` (renommés en `wil-playground2`
+pour ne pas entrer en conflit avec l'app de p3), les push sur GitLab, crée l'app Argo CD
+`wil-playground2` connectée à ce dépôt, puis expose l'appli sur le port `8889`
+(port-forward classique, pas de LoadBalancer ici pour ne pas devoir recréer le cluster).
 
 **Vérifier que l'app répond :**
 ```bash
@@ -267,7 +280,15 @@ curl http://localhost:8889/
 ```
 Doit renvoyer `{"status":"ok", "message": "v1"}`.
 
-**Passer de v1 à v2 :** directement dans l'interface GitLab — ouvrir `confs/deployment.yaml`, Edit, changer le tag, Commit changes. Ne pas relancer `update.sh` (il recopierait la version locale de p3, restée en v1).
+**Passer de v1 à v2 :** directement dans l'interface GitLab — ouvrir `confs/deployment.yaml`, Edit, changer le tag, Commit changes.
+
+**Mettre à jour après une modification locale (dans `gitlab_repo/`) :**
+```bash
+bash scripts/update.sh
+```
+Push les changements locaux vers GitLab et force la synchro Argo CD. À utiliser
+seulement pour des changements faits **après** `init.sh` — pas juste après avoir
+créé le dépôt, sinon ça repousserait la version locale de p3 (restée en v1).
 
 **Vérifier la synchronisation :**
 ```bash
@@ -283,8 +304,21 @@ curl http://localhost:8889/
 ```
 
 **Nettoyage :**
+
+**Dans P3: Le cluster (supprime GitLab, Valkey, Postgres, Garage, tout ce qui tournait dedans) :**
 ```bash
-k3d cluster delete iot
+bash scripts/clean.sh
 ```
-⚠️ Garage (stockage S3) n'a pas de stockage persistant — un arrêt du cluster casse durablement GitLab. Ne pas faire `k3d cluster stop`, seulement `delete` puis tout réinstaller.
+
+**Supprimer les fichiers locaux générés par le bonus (ne sont pas supprimés par le cluster) : Dans bonus**
+```bash
+rm -rf gitlab/ gitlab_repo/ .external-charts/ gitlab_password.txt
+```
+
+**Le port-forward GitLab, lancé avec sudo (donc invisible dans un ps aux classique) :**
+```bash
+sudo pkill -f "port-forward.*80:8181"
+```
+
+
 

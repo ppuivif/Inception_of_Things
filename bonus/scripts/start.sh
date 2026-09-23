@@ -7,6 +7,7 @@ source "${SCRIPT_DIR}/config.sh"
 
 BONUS_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
+# Gateway API CRDs that can conflict with the GitLab Helm chart install
 GATEWAY_CRDS=(
   backendtlspolicies.gateway.networking.k8s.io
   gatewayclasses.gateway.networking.k8s.io
@@ -28,10 +29,12 @@ for crd in "${GATEWAY_CRDS[@]}"; do
   kubectl delete crd "$crd" --ignore-not-found=true
 done
 
+# Local hostname used to reach GitLab from the browser
 HOST_ENTRY="127.0.0.1 gitlab.k3d.gitlab.com"
 HOSTS_FILE="/etc/hosts"
 GITLAB_NAMESPACE="gitlab"
 
+# Add the GitLab hostname to /etc/hosts if it's not already there
 if grep -Fq -- "$HOST_ENTRY" "$HOSTS_FILE"; then
   echo -e "${GREEN}$HOSTS_FILE already contains the GitLab host.${NC}"
 else
@@ -39,6 +42,7 @@ else
   printf '%s\n' "$HOST_ENTRY" | sudo tee -a "$HOSTS_FILE"
 fi
 
+# Create the dedicated namespace for GitLab if it doesn't exist yet
 if kubectl get namespace "$GITLAB_NAMESPACE" >/dev/null 2>&1; then
     echo -e "${GREEN}\nNamespace $GITLAB_NAMESPACE already exists.${NC}"
 else
@@ -46,6 +50,7 @@ else
   kubectl create namespace "$GITLAB_NAMESPACE"
 fi
 
+# Install GitLab itself via its Helm chart, using lightweight external services
 echo -e "${BLUE}\nInstalling GitLab via Helm in namespace $GITLAB_NAMESPACE ...${NC}"
 helm repo add gitlab https://charts.gitlab.io/
 helm repo update
@@ -65,11 +70,13 @@ helm upgrade --install gitlab gitlab/gitlab \
 echo -e "${BLUE}\nWaiting for GitLab podsready ...${NC}"
 kubectl wait --for=condition=ready --timeout=1200s pod -l app=webservice --namespace "$GITLAB_NAMESPACE"
 
+# Save the auto-generated root password to a local file for later login
 kubectl get secret gitlab-gitlab-initial-root-password \
   --namespace "$GITLAB_NAMESPACE" \
   --output=jsonpath="{.data.password}" | base64 -d > gitlab_password.txt
 sudo -v
 
+# Expose GitLab locally on port 80 (needs sudo, privileged port)
 echo -e "${BLUE}\nPort-forwarding to GitLab ...${NC}"
 if nc -z localhost 80; then
 	if lsof -iTCP:80 | grep -q 'kubectl'; then

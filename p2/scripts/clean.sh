@@ -14,7 +14,7 @@ fi
 
 cd "$PROJECT_DIR" || exit 1
 
-echo -e "${BLUE}\nCleaning P2 ...${NC}"
+echo -e "${BLUE}\nP2 cleaning ...${NC}"
 
 vagrant destroy -f
 

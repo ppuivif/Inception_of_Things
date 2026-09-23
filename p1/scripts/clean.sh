@@ -14,13 +14,12 @@ fi
 
 cd "$PROJECT_DIR" || exit 1
 
-echo "=== P1 cleaning ==="
+echo -e "${BLUE}\nP1 cleaning ...${NC}"
 vagrant destroy -f
 
 rm -f token
 
-echo
-echo "=== Checking for remaining VMs ==="
+echo -e "${BLUE}\nChecking for remaining VMs ...${NC}"
 if vagrant status | grep -qE 'running|poweroff|saved|aborted'; then
     echo -e "${RED}At least one VM still exists.${NC}"
 else

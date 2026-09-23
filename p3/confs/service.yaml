@@ -3,6 +3,7 @@ kind: Service
 metadata:
   name: wil-playground
 spec:
+  type: LoadBalancer
   selector:
     app: wil-playground
   ports:

@@ -21,7 +21,7 @@ if k3d cluster list | grep -q '^iot[[:space:]]'; then
 	echo -e "${GREEN}\nCluster 'iot' already exists.${NC}"
 else
 	echo -e "${BLUE}\nCreating the cluster 'iot' ..."
-	k3d cluster create iot
+	k3d cluster create iot -p "8888:8888@loadbalancer"
 fi
 
 # Check if namespaces exist, otherwise create them
@@ -87,14 +87,3 @@ while ! kubectl -n dev get deployment wil-playground &> /dev/null; do
 done
 
 kubectl wait --for=condition=available --timeout=120s deployment/wil-playground -n dev
-
-echo -e "${BLUE}\nPort-forwarding to the app ...${NC}"
-if nc -z localhost 8888; then
-	if lsof -i :8888 | grep -q 'kubectl'; then
-			echo -e "${GREEN}\nApp port-forward is already running.${NC}"
-	else
-		echo -e "${RED}\nPort 8888 is already used by another process.${NC}"
-		exit 1
-	fi
-else kubectl port-forward svc/wil-playground -n dev 8888:8888 2>&1 >/dev/null &
-fi

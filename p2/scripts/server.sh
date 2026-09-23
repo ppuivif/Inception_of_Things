@@ -2,9 +2,7 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-source "${SCRIPT_DIR}/config.sh"
+source "/vagrant/scripts/config.sh"
 
 # Get the network interface associated to IP
 IFACE=$(ip -o addr show | awk '$4 ~ /^192.168.56./ {print $2}' | head -1)
